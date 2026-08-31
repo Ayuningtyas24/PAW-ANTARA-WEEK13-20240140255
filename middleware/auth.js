@@ -13,8 +13,20 @@ const authService = require('../services/auth.service');
  * Suntik user ke res.locals supaya semua view bisa akses data user
  * TANPA harus ngirim manual dari setiap controller (DRY)
  */
+const statusColorMap = {
+  pending: 'yellow',
+  diproses: 'blue',
+  dikirim: 'purple',
+  selesai: 'green',
+  dibatalkan: 'red',
+};
+function getStatusColor(status) {
+  return statusColorMap[status] || 'gray';
+}
+
 async function attachUser(req, res, next) {
   res.locals.user = null;
+  res.locals.getStatusColor = getStatusColor;
   if (req.session && req.session.userId) {
     try {
       const user = await authService.getUserById(req.session.userId);
