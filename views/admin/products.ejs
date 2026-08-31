@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kelola Produk — <%= storeName %></title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .modal-overlay { transition: opacity 0.2s ease; }
+    .modal-content { transition: transform 0.2s ease, opacity 0.2s ease; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <%- include('../partials/nav', { storeName, active: 'admin-products' }) %>
+
+  <main class="max-w-6xl mx-auto px-4 pb-10">
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h2 class="text-xl font-bold text-gray-800">Kelola Produk</h2>
+        <p class="text-sm text-gray-400 mt-0.5"><%= products.length %> produk terdaftar</p>
+      </div>
+      <button
+        onclick="openModal()"
+        class="px-5 py-2.5 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white text-sm font-semibold rounded-xl transition-all duration-200 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 flex items-center gap-2">
+        ➕ Tambah Produk
+      </button>
+    </div>
+
+    <!-- Product Table -->
+    <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="bg-gray-50 border-b border-gray-200">
+              <th class="text-left px-5 py-3.5 text-gray-500 font-semibold">ID</th>
+              <th class="text-left px-5 py-3.5 text-gray-500 font-semibold">Nama</th>
+              <th class="text-left px-5 py-3.5 text-gray-500 font-semibold">Kategori</th>
+              <th class="text-right px-5 py-3.5 text-gray-500 font-semibold">Harga</th>
+              <th class="text-center px-5 py-3.5 text-gray-500 font-semibold">Stok</th>
+              <th class="text-center px-5 py-3.5 text-gray-500 font-semibold">Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% products.forEach(function(product) { %>
+              <tr class="border-b border-gray-100 hover:bg-gray-50/50 transition-colors" id="row-<%= product.id %>">
+                <td class="px-5 py-3.5 text-gray-400 font-mono">#<%= product.id %></td>
+                <td class="px-5 py-3.5">
+                  <p class="font-semibold text-gray-800"><%= product.name %></p>
+                  <p class="text-xs text-gray-400 mt-0.5 max-w-xs truncate"><%= product.description || '-' %></p>
+                </td>
+                <td class="px-5 py-3.5">
+                  <span class="inline-block px-2.5 py-1 text-xs font-medium rounded-full bg-slate-100 text-slate-600"><%= product.category || 'Umum' %></span>
+                </td>
+                <td class="px-5 py-3.5 text-right font-semibold text-gray-700">Rp<%= product.price.toLocaleString('id-ID') %></td>
+                <td class="px-5 py-3.5 text-center">
+                  <span class="inline-block px-2.5 py-1 text-xs font-bold rounded-full <%= product.stock > 10 ? 'bg-emerald-100 text-emerald-700' : product.stock > 0 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700' %>">
+                    <%= product.stock %>
+                  </span>
+                </td>
+                <td class="px-5 py-3.5 text-center">
+                  <div class="flex items-center justify-center gap-2">
+                    <button
+                      onclick='openModal(<%= JSON.stringify(product) %>)'
+                      class="px-3 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
+                      Edit
+                    </button>
+                    <button
+                      onclick="deleteProduct(<%= product.id %>, '<%= product.name.replace(/'/g, "\\'") %>')"
+                      class="px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
+                      Hapus
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+
+      <% if (products.length === 0) { %>
+        <div class="text-center py-16">
+          <div class="text-5xl mb-4">📦</div>
+          <p class="text-gray-400">Belum ada produk</p>
+        </div>
+      <% } %>
+    </div>
+  </main>
+
+  <!-- MODAL CREATE/EDIT PRODUCT -->
+  <div id="product-modal" class="fixed inset-0 z-50 hidden">
+    <div class="modal-overlay absolute inset-0 bg-black/40" onclick="closeModal()"></div>
+    <div class="flex items-center justify-center min-h-screen p-4">
+      <div class="modal-content bg-white rounded-2xl shadow-2xl w-full max-w-lg relative z-10">
+        <div class="px-6 py-5 border-b border-gray-200 flex items-center justify-between">
+          <h3 id="modal-title" class="text-lg font-bold text-gray-800">Tambah Produk</h3>
+          <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+        </div>
+        <form id="product-form" class="p-6 space-y-4">
+          <input type="hidden" id="product-id" />
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Nama Produk *</label>
+            <input type="text" id="product-name" required
+              class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50" />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Deskripsi</label>
+            <textarea id="product-desc" rows="3"
+              class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50 resize-none"></textarea>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Harga (Rp) *</label>
+              <input type="number" id="product-price" required min="0"
+                class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Stok</label>
+              <input type="number" id="product-stock" min="0" value="0"
+                class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50" />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Kategori</label>
+            <select id="product-category"
+              class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50">
+              <option value="Umum">Umum</option>
+              <option value="Kaos">Kaos</option>
+              <option value="Kemeja">Kemeja</option>
+              <option value="Celana">Celana</option>
+              <option value="Sepatu">Sepatu</option>
+              <option value="Aksesoris">Aksesoris</option>
+              <option value="Jaket">Jaket</option>
+              <option value="Tas">Tas</option>
+            </select>
+          </div>
+
+          <div id="form-error" class="hidden bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-3"></div>
+
+          <button type="submit" id="form-submit"
+            class="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold py-3 rounded-xl transition-all duration-200 shadow-lg shadow-blue-500/25">
+            Simpan
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const modal = document.getElementById('product-modal');
+    const form = document.getElementById('product-form');
+    const formError = document.getElementById('form-error');
+
+    function openModal(product = null) {
+      modal.classList.remove('hidden');
+      formError.classList.add('hidden');
+
+      if (product) {
+        document.getElementById('modal-title').textContent = 'Edit Produk';
+        document.getElementById('product-id').value = product.id;
+        document.getElementById('product-name').value = product.name;
+        document.getElementById('product-desc').value = product.description || '';
+        document.getElementById('product-price').value = product.price;
+        document.getElementById('product-stock').value = product.stock;
+        document.getElementById('product-category').value = product.category || 'Umum';
+      } else {
+        document.getElementById('modal-title').textContent = 'Tambah Produk';
+        document.getElementById('product-id').value = '';
+        form.reset();
+      }
+    }
+
+    function closeModal() {
+      modal.classList.add('hidden');
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      formError.classList.add('hidden');
+
+      const id = document.getElementById('product-id').value;
+      const data = {
+        name: document.getElementById('product-name').value,
+        description: document.getElementById('product-desc').value,
+        price: document.getElementById('product-price').value,
+        stock: document.getElementById('product-stock').value,
+        category: document.getElementById('product-category').value,
+      };
+
+      const isEdit = !!id;
+      const url = isEdit ? `/api/products/${id}` : '/api/products';
+      const method = isEdit ? 'PUT' : 'POST';
+
+      try {
+        const res = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        const result = await res.json();
+
+        if (!result.success) {
+          formError.textContent = result.message;
+          formError.classList.remove('hidden');
+          return;
+        }
+
+        window.location.reload();
+      } catch (err) {
+        formError.textContent = 'Gagal menyimpan: ' + err.message;
+        formError.classList.remove('hidden');
+      }
+    });
+
+    async function deleteProduct(id, name) {
+      if (!confirm(`Yakin hapus produk "${name}"?`)) return;
+
+      try {
+        const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+        const result = await res.json();
+
+        if (!result.success) {
+          alert(result.message);
+          return;
+        }
+
+        window.location.reload();
+      } catch (err) {
+        alert('Gagal menghapus: ' + err.message);
+      }
+    }
+  </script>
+</body>
+</html>

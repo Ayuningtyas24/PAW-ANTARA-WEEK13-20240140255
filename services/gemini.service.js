@@ -92,11 +92,11 @@ async function executeBuatPesanan({ namaProduk, jumlah, namaPembeli }) {
     };
   }
 
-  // 🛡️ DRY: fungsi yang SAMA PERSIS dipake form manual di halaman web
+  // 🛡️ DRY: interface yang SAMA PERSIS dipake form manual di halaman web
+  // Format: { buyerName, items: [{productId, quantity}] }
   const result = await orderService.createOrder({
-    productId: product.id,
-    quantity: Math.round(jumlah),
     buyerName: namaPembeli,
+    items: [{ productId: product.id, quantity: Math.round(jumlah) }],
   });
 
   return result;

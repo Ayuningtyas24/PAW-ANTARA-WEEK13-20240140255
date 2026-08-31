@@ -3,8 +3,7 @@ const orderService = require('../services/order.service');
 
 async function renderHome(req, res) {
   try {
-    // 🛡️ DRY: fungsi yang sama dipake juga di controllers/product.controller.js
-    // (GET /api/products) dan bot/handlers/stok.handler.js (/stok)
+    // 🛡️ DRY: fungsi yang sama dipake di banyak tempat
     const products = await productService.getAllProducts();
     const storeName = process.env.STORE_NAME || 'Toko Kita';
 
@@ -20,37 +19,50 @@ async function renderHome(req, res) {
 
 async function submitOrder(req, res) {
   try {
-    const { productId, quantity, buyerName } = req.body;
+    const { buyerName, items } = req.body;
+    const user = res.locals.user;
 
-    if (!productId || !quantity || !buyerName) {
-      return res.redirect('/?error=Semua field wajib diisi');
+    if (!buyerName || !items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ success: false, message: 'Data order tidak valid' });
     }
 
-    // 🛡️ DRY: fungsi yang sama persis nanganin logic cek stok, kurangin stok,
-    // simpen order, DAN notifikasi admin (semua di services/order.service.js)
+    // 🛡️ DRY: fungsi yang sama dipake juga oleh Gemini AI service
     const result = await orderService.createOrder({
-      productId: parseInt(productId, 10),
-      quantity: parseInt(quantity, 10),
       buyerName,
+      userId: user ? user.id : null,
+      items: items.map((item) => ({
+        productId: parseInt(item.productId, 10),
+        quantity: parseInt(item.quantity, 10),
+      })),
     });
 
     if (!result.success) {
-      const products = await productService.getAllProducts();
-      return res.render('index', {
-        products: products.map((p) => p.toJSON()),
-        storeName: process.env.STORE_NAME || 'Toko Kita',
-        error: result.message,
-      });
+      return res.status(400).json({ success: false, message: result.message });
     }
 
-    res.render('success', {
-      storeName: process.env.STORE_NAME || 'Toko Kita',
-      order: result.order,
-      product: result.product,
-    });
+    return res.json({ success: true, orderId: result.order.id });
   } catch (err) {
-    res.status(500).send('Gagal proses order: ' + err.message);
+    res.status(500).json({ success: false, message: 'Gagal proses order: ' + err.message });
   }
 }
 
-module.exports = { renderHome, submitOrder };
+async function renderSuccess(req, res) {
+  try {
+    const { orderId } = req.params;
+    const order = await orderService.getOrderById(orderId);
+
+    if (!order) {
+      return res.redirect('/');
+    }
+
+    const storeName = process.env.STORE_NAME || 'Toko Kita';
+    res.render('success', {
+      storeName,
+      order: order.toJSON(),
+    });
+  } catch (err) {
+    res.status(500).send('Gagal memuat halaman: ' + err.message);
+  }
+}
+
+module.exports = { renderHome, submitOrder, renderSuccess };

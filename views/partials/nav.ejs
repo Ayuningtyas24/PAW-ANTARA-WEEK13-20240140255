@@ -1,18 +1,69 @@
-<header class="bg-white border-b border-gray-200 py-4 px-6 mb-6">
-  <div class="max-w-5xl mx-auto flex items-center justify-between">
-    <div>
-      <h1 class="text-xl font-bold text-gray-800"><%= storeName %></h1>
-      <p class="text-sm text-gray-500">Belanja & tanya-tanya lewat chat AI</p>
-    </div>
-    <nav class="flex gap-2">
-      <a
-        href="/"
-        class="px-3 py-1.5 text-sm rounded-lg font-medium <%= active === 'katalog' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600' %>"
-      >Katalog & Chat</a>
-      <a
-        href="/invoices"
-        class="px-3 py-1.5 text-sm rounded-lg font-medium <%= active === 'invoice' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600' %>"
-      >Invoice</a>
+<header class="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-b border-slate-700/50 py-4 px-6 shadow-lg shadow-slate-900/20">
+  <div class="max-w-7xl mx-auto flex items-center justify-between">
+    <a href="/" class="group flex items-center gap-3">
+      <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/25 group-hover:shadow-blue-500/40 transition-shadow">
+        <span class="text-white text-lg font-black">🛍️</span>
+      </div>
+      <div>
+        <h1 class="text-lg font-bold text-white tracking-tight"><%= storeName %></h1>
+        <p class="text-xs text-slate-400 -mt-0.5">Smart Shopping Experience</p>
+      </div>
+    </a>
+
+    <nav class="flex items-center gap-2">
+      <% if (typeof user !== 'undefined' && user) { %>
+        <% if (user.role === 'admin') { %>
+          <a href="/admin"
+            class="px-3 py-2 text-sm rounded-lg font-medium transition-all duration-200 <%= active === 'dashboard' ? 'bg-white/10 text-white ring-1 ring-white/20' : 'text-slate-300 hover:text-white hover:bg-white/5' %>">
+            📊 Dashboard
+          </a>
+          <a href="/admin/products"
+            class="px-3 py-2 text-sm rounded-lg font-medium transition-all duration-200 <%= active === 'admin-products' ? 'bg-white/10 text-white ring-1 ring-white/20' : 'text-slate-300 hover:text-white hover:bg-white/5' %>">
+            📦 Produk
+          </a>
+          <a href="/admin/invoices"
+            class="px-3 py-2 text-sm rounded-lg font-medium transition-all duration-200 <%= active === 'admin-invoices' ? 'bg-white/10 text-white ring-1 ring-white/20' : 'text-slate-300 hover:text-white hover:bg-white/5' %>">
+            📋 Invoice
+          </a>
+        <% } %>
+        <a href="/"
+          class="px-3 py-2 text-sm rounded-lg font-medium transition-all duration-200 <%= active === 'katalog' ? 'bg-white/10 text-white ring-1 ring-white/20' : 'text-slate-300 hover:text-white hover:bg-white/5' %>">
+          🛒 Katalog
+        </a>
+        <% if (user.role === 'customer') { %>
+          <a href="/invoices"
+            class="px-3 py-2 text-sm rounded-lg font-medium transition-all duration-200 <%= active === 'invoice' ? 'bg-white/10 text-white ring-1 ring-white/20' : 'text-slate-300 hover:text-white hover:bg-white/5' %>">
+            📋 Pesanan Saya
+          </a>
+        <% } %>
+
+        <div class="h-6 w-px bg-slate-600 mx-2"></div>
+
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold shadow-md">
+            <%= user.fullName.charAt(0).toUpperCase() %>
+          </div>
+          <div class="hidden sm:block">
+            <p class="text-sm font-medium text-white leading-tight"><%= user.fullName %></p>
+            <p class="text-xs text-slate-400 -mt-0.5"><%= user.role === 'admin' ? '👑 Admin' : '👤 Customer' %></p>
+          </div>
+        </div>
+
+        <a href="/logout"
+          class="px-3 py-2 text-sm rounded-lg font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all duration-200">
+          Logout
+        </a>
+      <% } else { %>
+        <a href="/"
+          class="px-3 py-2 text-sm rounded-lg font-medium transition-all duration-200 <%= active === 'katalog' ? 'bg-white/10 text-white ring-1 ring-white/20' : 'text-slate-300 hover:text-white hover:bg-white/5' %>">
+          🛒 Katalog
+        </a>
+        <div class="h-6 w-px bg-slate-600 mx-1"></div>
+        <a href="/login"
+          class="px-4 py-2 text-sm rounded-lg font-semibold bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 transition-all duration-200 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40">
+          Login
+        </a>
+      <% } %>
     </nav>
   </div>
 </header>

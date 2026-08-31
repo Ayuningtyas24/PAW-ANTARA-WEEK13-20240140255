@@ -3,27 +3,71 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Order Berhasil</title>
+  <title>Order Berhasil — <%= storeName %></title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    @keyframes checkmark {
+      0% { transform: scale(0) rotate(-45deg); opacity: 0; }
+      50% { transform: scale(1.2) rotate(0deg); opacity: 1; }
+      100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    }
+    .check-anim { animation: checkmark 0.6s ease-out forwards; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .fade-up { animation: fadeUp 0.5s ease-out forwards; }
+    .fade-up-1 { animation-delay: 0.2s; opacity: 0; }
+    .fade-up-2 { animation-delay: 0.4s; opacity: 0; }
+  </style>
 </head>
-<body class="bg-gray-50 min-h-screen flex items-center justify-center px-4">
-  <div class="bg-white border border-gray-200 rounded-xl p-6 w-full max-w-sm text-center shadow-sm">
-    <div class="text-4xl mb-3">✅</div>
-    <h1 class="text-lg font-bold text-gray-800 mb-1">Order Berhasil!</h1>
-    <p class="text-sm text-gray-500 mb-4">Admin <%= storeName %> udah dapet notifikasi order kamu</p>
+<body class="bg-gradient-to-br from-emerald-50 via-white to-blue-50 min-h-screen flex items-center justify-center px-4">
+  <div class="w-full max-w-md text-center">
+    <div class="text-6xl mb-6 check-anim">✅</div>
+    <h1 class="text-2xl font-bold text-gray-800 mb-2 fade-up">Order Berhasil!</h1>
+    <p class="text-gray-500 mb-6 fade-up fade-up-1">Admin <%= storeName %> sudah dapet notifikasi order kamu</p>
 
-    <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-left text-sm text-gray-600 mb-4">
-      <p><strong>Order ID:</strong> #<%= order.id %></p>
-      <p><strong>Produk:</strong> <%= product.name %></p>
-      <p><strong>Jumlah:</strong> <%= order.quantity %></p>
-      <p><strong>Total:</strong> Rp<%= (product.price * order.quantity).toLocaleString('id-ID') %></p>
-      <p><strong>Atas nama:</strong> <%= order.buyerName %></p>
+    <div class="bg-white border border-gray-200 rounded-2xl p-5 text-left shadow-sm mb-6 fade-up fade-up-2">
+      <div class="flex items-center justify-between mb-4">
+        <span class="text-lg font-bold text-gray-800">INV-<%= String(order.id).padStart(5, '0') %></span>
+        <span class="text-xs text-gray-400">
+          <%= new Date(order.createdAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) %>
+        </span>
+      </div>
+
+      <div class="space-y-2 mb-4">
+        <% if (order.OrderItems && order.OrderItems.length > 0) { %>
+          <% order.OrderItems.forEach(function(item) { %>
+            <div class="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+              <div>
+                <p class="font-medium text-gray-800 text-sm"><%= item.Product ? item.Product.name : '(produk dihapus)' %></p>
+                <p class="text-xs text-gray-400"><%= item.quantity %> × Rp<%= item.price.toLocaleString('id-ID') %></p>
+              </div>
+              <p class="font-semibold text-gray-700 text-sm">Rp<%= (item.price * item.quantity).toLocaleString('id-ID') %></p>
+            </div>
+          <% }); %>
+        <% } %>
+      </div>
+
+      <div class="flex items-center justify-between pt-3 border-t border-gray-200">
+        <span class="text-gray-600 font-medium">Total</span>
+        <span class="text-lg font-extrabold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          Rp<%= order.totalAmount.toLocaleString('id-ID') %>
+        </span>
+      </div>
+
+      <div class="mt-3 pt-3 border-t border-gray-100 text-sm text-gray-500">
+        <p><strong>Atas nama:</strong> <%= order.buyerName %></p>
+      </div>
     </div>
 
-    <p class="text-xs text-gray-400 mb-4">Admin bakal segera menghubungi kamu buat konfirmasi pembayaran & pengiriman.</p>
+    <p class="text-xs text-gray-400 mb-6">Admin bakal segera menghubungi kamu buat konfirmasi pembayaran & pengiriman.</p>
 
-    <a href="/" class="block w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 rounded-lg">
-      Balik ke Katalog
+    <a href="/"
+      class="inline-block w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white text-sm font-semibold py-3 rounded-xl transition-all duration-200 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40">
+      ← Balik ke Katalog
     </a>
   </div>
 </body>

@@ -1,61 +1,96 @@
-const { Order, Product } = require('../models');
+const { Order, OrderItem, Product, User, sequelize } = require('../models');
 const { formatRupiah } = require('../utils/formatRupiah');
 const bot = require('../config/telegram');
 
 /**
- * 🛡️ DRY - SERVICE LAYER
+ * 🛡️ DRY - SERVICE LAYER ORDER
  * ============================================================
- * createOrder() dipanggil dari controllers/order.controller.js (web).
- * notifyAdminNewOrder() dipanggil DARI DALAM createOrder() otomatis,
- * jadi logic "kurangin stok -> simpen order -> kirim notif admin"
- * cukup ditulis SEKALI di sini, gak nyebar ke banyak tempat.
+ * createOrder() dipanggil dari:
+ * 1. controllers/page.controller.js  (checkout dari cart)
+ * 2. services/gemini.service.js      (AI chat order)
  *
- * Bagian DRY paling kentara di project ini justru ada di
- * services/product.service.js: fungsi getAllProducts() dan
- * formatProductListText() dipake bareng-bareng di 3 tempat beda:
- * 1. Halaman web katalog (views/index.ejs, lewat page.controller.js)
- * 2. REST API GET /api/products
- * 3. Perintah /stok di bot Telegram (bot/handlers/stok.handler.js)
+ * Logic cek stok → kurangin stok → simpen order → notif admin
+ * SEMUA di sini, gak nyebar ke banyak tempat.
  * ============================================================
  */
-async function createOrder({ productId, quantity, buyerName }) {
-  const product = await Product.findByPk(productId);
 
-  if (!product) {
-    return { success: false, message: `Produk dengan ID ${productId} gak ditemukan` };
+/**
+ * Buat order baru dengan MULTIPLE ITEMS (support beli 2+ produk sekaligus).
+ * Pakai database transaction — all-or-nothing, kalo ada 1 item gagal,
+ * semua di-rollback.
+ *
+ * @param {Object} params
+ * @param {string} params.buyerName
+ * @param {number|null} params.userId
+ * @param {Array<{productId: number, quantity: number}>} params.items
+ */
+async function createOrder({ buyerName, userId = null, items }) {
+  const t = await sequelize.transaction();
+
+  try {
+    // 1. Validasi SEMUA item sebelum create
+    const productDetails = [];
+    for (const item of items) {
+      const product = await Product.findByPk(item.productId, { transaction: t });
+      if (!product) {
+        await t.rollback();
+        return { success: false, message: `Produk dengan ID ${item.productId} gak ditemukan` };
+      }
+      if (product.stock < item.quantity) {
+        await t.rollback();
+        return {
+          success: false,
+          message: `Stok "${product.name}" gak cukup. Tersedia: ${product.stock}, diminta: ${item.quantity}`,
+        };
+      }
+      productDetails.push({ product, quantity: item.quantity });
+    }
+
+    // 2. Hitung total
+    let totalAmount = 0;
+    for (const { product, quantity } of productDetails) {
+      totalAmount += product.price * quantity;
+    }
+
+    // 3. Buat Order
+    const order = await Order.create(
+      { buyerName, userId, totalAmount, status: 'pending' },
+      { transaction: t }
+    );
+
+    // 4. Buat OrderItem + kurangin stok
+    for (const { product, quantity } of productDetails) {
+      await OrderItem.create(
+        {
+          orderId: order.id,
+          productId: product.id,
+          quantity,
+          price: product.price,
+        },
+        { transaction: t }
+      );
+
+      product.stock -= quantity;
+      await product.save({ transaction: t });
+    }
+
+    await t.commit();
+
+    // 5. Notif admin (di luar transaction, gak boleh block order kalo notif gagal)
+    await notifyAdminNewOrder(order, productDetails);
+
+    return { success: true, order, items: productDetails };
+  } catch (err) {
+    await t.rollback();
+    throw err;
   }
-
-  if (product.stock < quantity) {
-    return {
-      success: false,
-      message: `Stok gak cukup. Stok tersedia: ${product.stock}, kamu minta: ${quantity}`,
-    };
-  }
-
-  const order = await Order.create({
-    productId: product.id,
-    quantity,
-    buyerName,
-  });
-
-  // kurangin stok - juga logic bisnis yang sama buat kedua pintu masuk
-  product.stock -= quantity;
-  await product.save();
-
-  // 🛡️ DRY lagi: notifyAdminNewOrder dipanggil di sini, otomatis
-  // ke-trigger baik order-nya datang dari web maupun dari Telegram
-  await notifyAdminNewOrder(order, product);
-
-  return { success: true, order, product };
 }
 
 /**
- * Kirim notifikasi ke admin lewat Telegram tiap ada order baru,
- * APAPUN sumbernya (web atau Telegram). Ini juga contoh reuse:
- * fungsi kirim pesan Telegram yang sama dipake buat notifikasi admin,
- * bukan cuma buat balesan ke pembeli.
+ * Kirim notifikasi ke admin lewat Telegram tiap ada order baru.
+ * Diupdate buat support multi-item notification.
  */
-async function notifyAdminNewOrder(order, product) {
+async function notifyAdminNewOrder(order, productDetails) {
   const adminChatId = process.env.ADMIN_TELEGRAM_CHAT_ID;
 
   if (!bot || !adminChatId || adminChatId === 'isi-chat-id-admin') {
@@ -63,22 +98,21 @@ async function notifyAdminNewOrder(order, product) {
     return;
   }
 
-  const total = formatRupiah(product.price * order.quantity);
-
-  // product.stock di titik ini SUDAH dikurangi (liat createOrder di atas,
-  // notifyAdminNewOrder dipanggil SETELAH product.save())
-  const stockWarning = product.stock <= 5 ? ' ⚠️ MENIPIS' : '';
+  const itemLines = productDetails.map(({ product, quantity }) => {
+    const stockWarning = product.stock <= 5 ? ' ⚠️ MENIPIS' : '';
+    return `  • ${product.name} x${quantity} = ${formatRupiah(product.price * quantity)}${stockWarning}`;
+  });
 
   const text = [
     '🔔 Order baru masuk!',
     '',
-    `Produk: ${product.name}`,
-    `Jumlah dipesan: ${order.quantity}`,
-    `Total: ${total}`,
     `Pembeli: ${order.buyerName}`,
     `Order ID: #${order.id}`,
     '',
-    `📦 Sisa stok sekarang: ${product.stock}${stockWarning}`,
+    'Produk:',
+    ...itemLines,
+    '',
+    `💰 Total: ${formatRupiah(order.totalAmount)}`,
   ].join('\n');
 
   try {
@@ -89,7 +123,76 @@ async function notifyAdminNewOrder(order, product) {
 }
 
 async function getAllOrders() {
-  return Order.findAll({ include: Product, order: [['createdAt', 'DESC']] });
+  return Order.findAll({
+    include: [
+      {
+        model: OrderItem,
+        include: [Product],
+      },
+      {
+        model: User,
+        attributes: ['id', 'username', 'fullName'],
+      },
+    ],
+    order: [['createdAt', 'DESC']],
+  });
 }
 
-module.exports = { createOrder, notifyAdminNewOrder, getAllOrders };
+async function getOrdersByUserId(userId) {
+  return Order.findAll({
+    where: { userId },
+    include: [
+      {
+        model: OrderItem,
+        include: [Product],
+      },
+    ],
+    order: [['createdAt', 'DESC']],
+  });
+}
+
+async function getOrderById(id) {
+  return Order.findByPk(id, {
+    include: [
+      {
+        model: OrderItem,
+        include: [Product],
+      },
+      {
+        model: User,
+        attributes: ['id', 'username', 'fullName'],
+      },
+    ],
+  });
+}
+
+async function updateOrderStatus(id, status) {
+  const order = await Order.findByPk(id);
+  if (!order) {
+    return { success: false, message: 'Order tidak ditemukan' };
+  }
+
+  order.status = status;
+  await order.save();
+  return { success: true, order };
+}
+
+async function countOrders() {
+  return Order.count();
+}
+
+async function getTotalRevenue() {
+  const result = await Order.sum('totalAmount');
+  return result || 0;
+}
+
+module.exports = {
+  createOrder,
+  notifyAdminNewOrder,
+  getAllOrders,
+  getOrdersByUserId,
+  getOrderById,
+  updateOrderStatus,
+  countOrders,
+  getTotalRevenue,
+};
