@@ -44,7 +44,11 @@
             <div class="flex items-center gap-3">
               <span class="text-base font-bold text-gray-800">INV-<%= String(order.id).padStart(5, '0') %></span>
               <span id="badge-<%= order.id %>">
-                <%- include('../partials/badge', { label: order.status, color: getStatusColor(order.status) }) %>
+                <% 
+                  const statusColors = { pending: 'yellow', diproses: 'blue', dikirim: 'purple', selesai: 'green', dibatalkan: 'red' };
+                  const badgeColor = typeof getStatusColor === 'function' ? getStatusColor(order.status) : (statusColors[order.status] || 'gray');
+                %>
+                <%- include('../partials/badge', { label: order.status, color: badgeColor }) %>
               </span>
             </div>
             <div class="flex items-center gap-3">
